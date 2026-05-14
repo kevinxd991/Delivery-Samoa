@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 
 # =========================================================
-# CONFIGURACION DE PAGINA
+# CONFIGURACION PAGINA
 # =========================================================
 
 st.set_page_config(
@@ -23,7 +23,7 @@ st.markdown("""
     background-color: #0E1117;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4 {
     color: white;
 }
 
@@ -34,11 +34,15 @@ h1, h2, h3 {
     border-radius: 15px;
 }
 
+.stAlert {
+    border-radius: 12px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 # =========================================================
-# CARGA DE DATOS
+# CARGA DATOS GOOGLE SHEETS
 # =========================================================
 
 sheet_id = "1LXPe-ZN-Hcc9_PgrkRNVAtvIZkyk3WCT0uSFBocfvM8"
@@ -48,12 +52,11 @@ url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
 df = pd.read_csv(url)
 
 # =========================================================
-# LIMPIEZA Y PREPARACION
+# LIMPIEZA
 # =========================================================
 
 df.columns = df.columns.str.strip()
 
-# Orden correcto de meses
 orden_meses = {
     "Enero": 1,
     "Febrero": 2,
@@ -71,7 +74,6 @@ orden_meses = {
 
 df["MES_NUM"] = df["MES"].map(orden_meses)
 
-# Ordenar
 df = df.sort_values(by=["AÑO", "MES_NUM"])
 
 # Ticket promedio
@@ -80,19 +82,10 @@ df["TICKET_PROMEDIO"] = (
 )
 
 # =========================================================
-# TITULO
-# =========================================================
-
-st.title("📦 Dashboard Ejecutivo Delivery")
-st.markdown("### Análisis histórico de ventas y deliverys")
-
-st.divider()
-
-# =========================================================
 # SIDEBAR
 # =========================================================
 
-st.sidebar.header("Filtros")
+st.sidebar.title("📊 Filtros")
 
 anios = sorted(df["AÑO"].unique())
 
@@ -102,24 +95,40 @@ anios_seleccionados = st.sidebar.multiselect(
     default=anios
 )
 
-meses = st.sidebar.multiselect(
+meses = sorted(
+    df["MES"].unique(),
+    key=lambda x: orden_meses[x]
+)
+
+meses_seleccionados = st.sidebar.multiselect(
     "Selecciona Mes(es)",
-    sorted(df["MES"].unique(), key=lambda x: orden_meses[x]),
-    default=sorted(df["MES"].unique(), key=lambda x: orden_meses[x])
+    meses,
+    default=meses
 )
 
 # =========================================================
-# FILTRADO
+# FILTRO
 # =========================================================
 
 df_filtrado = df[
     (df["AÑO"].isin(anios_seleccionados)) &
-    (df["MES"].isin(meses))
+    (df["MES"].isin(meses_seleccionados))
 ]
+
+# =========================================================
+# TITULO
+# =========================================================
+
+st.title("📦 Dashboard Ejecutivo Delivery")
+st.markdown("### Análisis Histórico de Deliverys y Ventas")
+
+st.divider()
 
 # =========================================================
 # KPIs
 # =========================================================
+
+st.subheader("📌 KPIs Principales")
 
 total_deliverys = int(df_filtrado["CANTIDAD_DELIVERYS"].sum())
 
@@ -127,30 +136,89 @@ venta_total = df_filtrado["VENTA_TOTAL"].sum()
 
 ticket_promedio = df_filtrado["TICKET_PROMEDIO"].mean()
 
-col1, col2, col3 = st.columns(3)
+mejor_anio = (
+    df_filtrado.groupby("AÑO")["VENTA_TOTAL"]
+    .sum()
+    .idxmax()
+)
 
-with col1:
+mejor_mes = (
+    df_filtrado.loc[
+        df_filtrado["VENTA_TOTAL"].idxmax(),
+        "MES"
+    ]
+)
+
+c1, c2, c3, c4, c5 = st.columns(5)
+
+with c1:
     st.metric(
-        "📦 Total Deliverys",
+        "📦 Deliverys",
         f"{total_deliverys:,}"
     )
 
-with col2:
+with c2:
     st.metric(
         "💰 Venta Total",
-        f"S/ {venta_total:,.2f}"
+        f"S/ {venta_total:,.0f}"
     )
 
-with col3:
+with c3:
     st.metric(
-        "🧾 Ticket Promedio",
+        "🧾 Ticket Prom.",
         f"S/ {ticket_promedio:,.2f}"
+    )
+
+with c4:
+    st.metric(
+        "🏆 Mejor Año",
+        f"{mejor_anio}"
+    )
+
+with c5:
+    st.metric(
+        "🔥 Mejor Mes",
+        f"{mejor_mes}"
     )
 
 st.divider()
 
 # =========================================================
-# GRAFICO 1 - VENTAS
+# HALLAZGOS
+# =========================================================
+
+st.subheader("📌 Hallazgos Clave")
+
+st.info(
+    """
+Durante el periodo COVID-19 (2020-2021) se observa un incremento significativo
+en la demanda de deliverys y ventas debido a las restricciones de movilidad
+y el crecimiento del consumo mediante canales de entrega.
+"""
+)
+
+# =========================================================
+# TOPS
+# =========================================================
+
+st.subheader("🏆 Top Meses por Ventas")
+
+top_meses = (
+    df_filtrado
+    .sort_values(by="VENTA_TOTAL", ascending=False)
+    [["AÑO", "MES", "VENTA_TOTAL", "CANTIDAD_DELIVERYS"]]
+    .head(5)
+)
+
+st.dataframe(
+    top_meses,
+    use_container_width=True
+)
+
+st.divider()
+
+# =========================================================
+# GRAFICO VENTAS
 # =========================================================
 
 st.subheader("💰 Comparativa de Ventas por Año")
@@ -160,7 +228,8 @@ fig1 = px.bar(
     x="MES",
     y="VENTA_TOTAL",
     color="AÑO",
-    barmode="group"
+    barmode="group",
+    text_auto=".2s"
 )
 
 fig1.update_layout(
@@ -174,7 +243,7 @@ fig1.update_layout(
 st.plotly_chart(fig1, use_container_width=True)
 
 # =========================================================
-# GRAFICO 2 - DELIVERYS
+# GRAFICO DELIVERYS
 # =========================================================
 
 st.subheader("📦 Comparativa de Deliverys")
@@ -184,24 +253,86 @@ fig2 = px.bar(
     x="MES",
     y="CANTIDAD_DELIVERYS",
     color="AÑO",
-    barmode="group"
+    barmode="group",
+    text_auto=True
 )
 
 fig2.update_layout(
     template="plotly_dark",
     height=500,
     xaxis_title="Mes",
-    yaxis_title="Cantidad de Deliverys",
+    yaxis_title="Cantidad Deliverys",
     legend_title="Año"
 )
 
 st.plotly_chart(fig2, use_container_width=True)
 
 # =========================================================
-# GRAFICO 3 - TICKET PROMEDIO
+# EVOLUCION POR MES
 # =========================================================
 
-st.subheader("🧾 Evolución del Ticket Promedio")
+st.subheader("📈 Evolución Histórica por Mes")
+
+for mes in meses_seleccionados:
+
+    st.markdown(f"### {mes}")
+
+    df_mes = df_filtrado[df_filtrado["MES"] == mes]
+
+    fig_mes = px.line(
+        df_mes,
+        x="AÑO",
+        y="VENTA_TOTAL",
+        markers=True,
+        text="VENTA_TOTAL"
+    )
+
+    fig_mes.update_layout(
+        template="plotly_dark",
+        height=400,
+        xaxis_title="Año",
+        yaxis_title="Venta Total"
+    )
+
+    st.plotly_chart(fig_mes, use_container_width=True)
+
+# =========================================================
+# CRECIMIENTO %
+# =========================================================
+
+st.subheader("📊 Crecimiento Porcentual por Año")
+
+df_crecimiento = df_filtrado.copy()
+
+df_crecimiento["CRECIMIENTO_%"] = (
+    df_crecimiento
+    .groupby("MES")["VENTA_TOTAL"]
+    .pct_change() * 100
+)
+
+fig_growth = px.bar(
+    df_crecimiento,
+    x="AÑO",
+    y="CRECIMIENTO_%",
+    color="MES",
+    barmode="group",
+    text_auto=".2f"
+)
+
+fig_growth.update_layout(
+    template="plotly_dark",
+    height=500,
+    xaxis_title="Año",
+    yaxis_title="Crecimiento %"
+)
+
+st.plotly_chart(fig_growth, use_container_width=True)
+
+# =========================================================
+# TICKET PROMEDIO
+# =========================================================
+
+st.subheader("🧾 Evolución Ticket Promedio")
 
 fig3 = px.line(
     df_filtrado,
@@ -215,78 +346,35 @@ fig3.update_layout(
     template="plotly_dark",
     height=500,
     xaxis_title="Mes",
-    yaxis_title="Ticket Promedio",
-    legend_title="Año"
+    yaxis_title="Ticket Promedio"
 )
 
 st.plotly_chart(fig3, use_container_width=True)
 
 # =========================================================
-# CRECIMIENTO
+# TABLA DETALLADA
 # =========================================================
 
-st.subheader("📈 Resumen Ejecutivo")
-
-if len(anios_seleccionados) >= 2:
-
-    anio_actual = max(anios_seleccionados)
-    anio_pasado = sorted(anios_seleccionados)[-2]
-
-    actual = df_filtrado[df_filtrado["AÑO"] == anio_actual]
-    pasado = df_filtrado[df_filtrado["AÑO"] == anio_pasado]
-
-    venta_actual = actual["VENTA_TOTAL"].sum()
-    venta_pasada = pasado["VENTA_TOTAL"].sum()
-
-    delivery_actual = actual["CANTIDAD_DELIVERYS"].sum()
-    delivery_pasado = pasado["CANTIDAD_DELIVERYS"].sum()
-
-    ticket_actual = actual["TICKET_PROMEDIO"].mean()
-    ticket_pasado = pasado["TICKET_PROMEDIO"].mean()
-
-    crecimiento_ventas = (
-        (venta_actual - venta_pasada) / venta_pasada
-    ) * 100
-
-    crecimiento_deliverys = (
-        (delivery_actual - delivery_pasado) / delivery_pasado
-    ) * 100
-
-    crecimiento_ticket = (
-        (ticket_actual - ticket_pasado) / ticket_pasado
-    ) * 100
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric(
-            "Crecimiento Ventas",
-            f"{crecimiento_ventas:.2f}%"
-        )
-
-    with c2:
-        st.metric(
-            "Crecimiento Deliverys",
-            f"{crecimiento_deliverys:.2f}%"
-        )
-
-    with c3:
-        st.metric(
-            "Crecimiento Ticket",
-            f"{crecimiento_ticket:.2f}%"
-        )
-
-st.divider()
-
-# =========================================================
-# TABLA
-# =========================================================
-
-st.subheader("📋 Datos Detallados")
+st.subheader("📋 Tabla Detallada")
 
 st.dataframe(
     df_filtrado,
     use_container_width=True
+)
+
+# =========================================================
+# CONCLUSION
+# =========================================================
+
+st.subheader("📌 Conclusión Ejecutiva")
+
+st.success(
+    """
+El negocio presenta una tendencia positiva en ventas y cantidad de deliverys,
+con un crecimiento acelerado durante el periodo de pandemia y estabilización
+en los años posteriores. El ticket promedio mantiene una tendencia estable,
+lo que evidencia consistencia en el comportamiento de compra.
+"""
 )
 
 # =========================================================
