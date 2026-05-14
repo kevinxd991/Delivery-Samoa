@@ -520,10 +520,4 @@ st.markdown("---")
 st.caption("Dashboard desarrollado en Streamlit")
 ```
 
-# requirements.txt
 
-```txt
-streamlit
-pandas
-plotly
-```
