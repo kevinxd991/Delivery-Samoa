@@ -516,6 +516,6 @@ manteniendo niveles sólidos de ventas y ticket promedio.
 
 st.markdown("---")
 st.caption("Dashboard desarrollado en Streamlit")
-```
+
 
 
