@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -57,6 +56,7 @@ h1, h2, h3, h4 {
 # =========================================================
 
 sheet_id = "1LXPe-ZN-Hcc9_PgrkRNVAtvIZkyk3WCT0uSFBocfvM8"
+
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
 
 df = pd.read_csv(url)
@@ -94,8 +94,6 @@ df["TICKET_PROMEDIO"] = (
     df["VENTA_TOTAL"] / df["CANTIDAD_DELIVERYS"]
 )
 
-# Crecimiento porcentual
-
 df["CRECIMIENTO_%"] = (
     df.groupby("MES")["VENTA_TOTAL"]
     .pct_change() * 100
@@ -131,7 +129,9 @@ modo = st.sidebar.radio(
 st.subheader("📌 KPIs Principales")
 
 total_deliverys = int(df["CANTIDAD_DELIVERYS"].sum())
+
 venta_total = df["VENTA_TOTAL"].sum()
+
 ticket_promedio = df["TICKET_PROMEDIO"].mean()
 
 mejor_anio = (
@@ -190,7 +190,7 @@ with c6:
 st.divider()
 
 # =========================================================
-# INSIGHTS
+# HALLAZGOS
 # =========================================================
 
 st.subheader("📌 Hallazgos Clave")
@@ -216,13 +216,13 @@ top_anios = (
     .head(3)
 )
 
-col_top1, col_top2, col_top3 = st.columns(3)
-
 ranking = list(top_anios.items())
 
 medallas = ["🥇", "🥈", "🥉"]
 
-for i, col in enumerate([col_top1, col_top2, col_top3]):
+col1, col2, col3 = st.columns(3)
+
+for i, col in enumerate([col1, col2, col3]):
     with col:
         st.metric(
             f"{medallas[i]} Año {ranking[i][0]}",
@@ -259,7 +259,10 @@ comparacion = pd.DataFrame({
     ]
 })
 
-st.dataframe(comparacion, use_container_width=True)
+st.dataframe(
+    comparacion,
+    use_container_width=True
+)
 
 st.divider()
 
@@ -288,49 +291,100 @@ fig_heatmap.update_layout(
     height=500
 )
 
-st.plotly_chart(fig_heatmap, use_container_width=True)
+st.plotly_chart(
+    fig_heatmap,
+    use_container_width=True
+)
 
 st.divider()
 
 # =========================================================
-# MODO GENERAL
+# VISTA GENERAL
 # =========================================================
 
 if modo == "Vista General":
 
-    st.subheader("💰 Ventas por Mes y Año")
+    st.subheader("📈 Evolución General del Negocio")
 
-    fig1 = px.bar(
+    # =====================================================
+    # DELIVERYS
+    # =====================================================
+
+    fig_general_delivery = px.line(
         df,
-        x="MES",
-        y="VENTA_TOTAL",
-        color="AÑO",
-        barmode="group"
-    )
-
-    fig1.update_layout(
-        template="plotly_dark",
-        height=500
-    )
-
-    st.plotly_chart(fig1, use_container_width=True)
-
-    st.subheader("📦 Deliverys por Mes y Año")
-
-    fig2 = px.bar(
-        df,
-        x="MES",
+        x="AÑO",
         y="CANTIDAD_DELIVERYS",
-        color="AÑO",
-        barmode="group"
+        color="MES",
+        markers=True
     )
 
-    fig2.update_layout(
+    fig_general_delivery.update_layout(
         template="plotly_dark",
-        height=500
+        height=550,
+        title="Evolución Histórica de Deliverys",
+        xaxis_title="Año",
+        yaxis_title="Cantidad de Deliverys",
+        legend_title="Mes"
     )
 
-    st.plotly_chart(fig2, use_container_width=True)
+    fig_general_delivery.add_vline(
+        x=2020,
+        line_width=2,
+        line_dash="dash",
+        line_color="red"
+    )
+
+    fig_general_delivery.add_annotation(
+        x=2020,
+        y=df["CANTIDAD_DELIVERYS"].max(),
+        text="COVID",
+        showarrow=True
+    )
+
+    st.plotly_chart(
+        fig_general_delivery,
+        use_container_width=True
+    )
+
+    # =====================================================
+    # VENTAS
+    # =====================================================
+
+    fig_general_ventas = px.line(
+        df,
+        x="AÑO",
+        y="VENTA_TOTAL",
+        color="MES",
+        markers=True
+    )
+
+    fig_general_ventas.update_layout(
+        template="plotly_dark",
+        height=550,
+        title="Evolución Histórica de Ventas",
+        xaxis_title="Año",
+        yaxis_title="Venta Total",
+        legend_title="Mes"
+    )
+
+    fig_general_ventas.add_vline(
+        x=2020,
+        line_width=2,
+        line_dash="dash",
+        line_color="red"
+    )
+
+    fig_general_ventas.add_annotation(
+        x=2020,
+        y=df["VENTA_TOTAL"].max(),
+        text="COVID",
+        showarrow=True
+    )
+
+    st.plotly_chart(
+        fig_general_ventas,
+        use_container_width=True
+    )
 
 # =========================================================
 # ANALISIS POR MES
@@ -338,10 +392,10 @@ if modo == "Vista General":
 
 else:
 
-    st.subheader("📈 Evolución Histórica por Mes")
+    st.subheader("📊 Análisis Histórico por Mes")
 
     mes_seleccionado = st.selectbox(
-        "Selecciona un Mes",
+        "Selecciona un mes",
         sorted(
             df["MES"].unique(),
             key=lambda x: orden_meses[x]
@@ -351,80 +405,175 @@ else:
     df_mes = df[df["MES"] == mes_seleccionado]
 
     # =====================================================
-    # KPI DEL MES
+    # KPIS DEL MES
     # =====================================================
 
-    top_anio_mes = (
+    st.markdown(f"## 📌 Resumen Ejecutivo - {mes_seleccionado}")
+
+    top_anio = (
         df_mes.loc[df_mes["VENTA_TOTAL"].idxmax()]
     )
 
-    colm1, colm2, colm3 = st.columns(3)
+    crecimiento_total_mes = (
+        (
+            df_mes.iloc[-1]["VENTA_TOTAL"]
+            - df_mes.iloc[0]["VENTA_TOTAL"]
+        )
+        / df_mes.iloc[0]["VENTA_TOTAL"]
+    ) * 100
 
-    with colm1:
+    k1, k2, k3, k4 = st.columns(4)
+
+    with k1:
         st.metric(
             "🏆 Mejor Año",
-            f"{top_anio_mes['AÑO']}"
+            f"{top_anio['AÑO']}"
         )
 
-    with colm2:
+    with k2:
         st.metric(
             "💰 Mayor Venta",
-            f"S/ {top_anio_mes['VENTA_TOTAL']:,.0f}"
+            f"S/ {top_anio['VENTA_TOTAL']:,.0f}"
         )
 
-    with colm3:
+    with k3:
         st.metric(
-            "📦 Deliverys",
-            f"{int(top_anio_mes['CANTIDAD_DELIVERYS']):,}"
+            "📦 Mayor Delivery",
+            f"{int(top_anio['CANTIDAD_DELIVERYS']):,}"
+        )
+
+    with k4:
+        st.metric(
+            "📈 Crecimiento Histórico",
+            f"{crecimiento_total_mes:.2f}%"
         )
 
     st.divider()
 
     # =====================================================
-    # DELIVERYS
+    # GRAFICO DELIVERYS
     # =====================================================
 
-    st.subheader(f"📦 Evolución Deliverys - {mes_seleccionado}")
+    st.subheader(
+        f"📦 Evolución Histórica de Deliverys - {mes_seleccionado}"
+    )
 
-    fig_delivery = px.bar(
+    fig_delivery = px.line(
         df_mes,
         x="AÑO",
         y="CANTIDAD_DELIVERYS",
-        text_auto=True
+        markers=True,
+        text="CANTIDAD_DELIVERYS"
+    )
+
+    fig_delivery.update_traces(
+        textposition="top center"
     )
 
     fig_delivery.update_layout(
         template="plotly_dark",
-        height=500
+        height=550,
+        xaxis_title="Año",
+        yaxis_title="Cantidad Deliverys"
     )
 
-    st.plotly_chart(fig_delivery, use_container_width=True)
+    fig_delivery.add_vline(
+        x=2020,
+        line_width=2,
+        line_dash="dash",
+        line_color="red"
+    )
+
+    fig_delivery.add_annotation(
+        x=2020,
+        y=df_mes["CANTIDAD_DELIVERYS"].max(),
+        text="COVID",
+        showarrow=True
+    )
+
+    st.plotly_chart(
+        fig_delivery,
+        use_container_width=True
+    )
 
     # =====================================================
-    # VENTAS
+    # INSIGHT DELIVERYS
     # =====================================================
 
-    st.subheader(f"💰 Evolución Ventas - {mes_seleccionado}")
+    delivery_inicio = df_mes.iloc[0]["CANTIDAD_DELIVERYS"]
+    delivery_final = df_mes.iloc[-1]["CANTIDAD_DELIVERYS"]
+
+    if delivery_final > delivery_inicio:
+
+        st.success(
+            f"""
+            📌 El mes de {mes_seleccionado} presenta una tendencia
+            creciente en la cantidad de deliverys respecto a los
+            primeros años analizados.
+            """
+        )
+
+    else:
+
+        st.warning(
+            f"""
+            📌 El mes de {mes_seleccionado} presenta una desaceleración
+            en la cantidad de deliverys.
+            """
+        )
+
+    st.divider()
+
+    # =====================================================
+    # GRAFICO VENTAS
+    # =====================================================
+
+    st.subheader(
+        f"💰 Evolución Histórica de Ventas - {mes_seleccionado}"
+    )
 
     fig_ventas = px.bar(
         df_mes,
         x="AÑO",
         y="VENTA_TOTAL",
-        text_auto='.2s'
+        text_auto=".2s"
     )
 
     fig_ventas.update_layout(
         template="plotly_dark",
-        height=500
+        height=550,
+        xaxis_title="Año",
+        yaxis_title="Venta Total"
     )
 
-    st.plotly_chart(fig_ventas, use_container_width=True)
+    fig_ventas.add_vline(
+        x=2020,
+        line_width=2,
+        line_dash="dash",
+        line_color="red"
+    )
+
+    fig_ventas.add_annotation(
+        x=2020,
+        y=df_mes["VENTA_TOTAL"].max(),
+        text="COVID",
+        showarrow=True
+    )
+
+    st.plotly_chart(
+        fig_ventas,
+        use_container_width=True
+    )
+
+    st.divider()
 
     # =====================================================
     # TICKET PROMEDIO
     # =====================================================
 
-    st.subheader(f"🧾 Ticket Promedio - {mes_seleccionado}")
+    st.subheader(
+        f"🧾 Evolución Ticket Promedio - {mes_seleccionado}"
+    )
 
     fig_ticket = px.line(
         df_mes,
@@ -434,63 +583,102 @@ else:
         text=df_mes["TICKET_PROMEDIO"].round(2)
     )
 
-    fig_ticket.update_layout(
-        template="plotly_dark",
-        height=500
+    fig_ticket.update_traces(
+        textposition="top center"
     )
 
-    st.plotly_chart(fig_ticket, use_container_width=True)
+    fig_ticket.update_layout(
+        template="plotly_dark",
+        height=550,
+        xaxis_title="Año",
+        yaxis_title="Ticket Promedio"
+    )
+
+    st.plotly_chart(
+        fig_ticket,
+        use_container_width=True
+    )
+
+    st.divider()
 
     # =====================================================
-    # CRECIMIENTO
+    # CRECIMIENTO %
     # =====================================================
 
-    st.subheader(f"📈 Crecimiento % - {mes_seleccionado}")
+    st.subheader(
+        f"📈 Crecimiento % Histórico - {mes_seleccionado}"
+    )
 
     fig_growth = px.bar(
         df_mes,
         x="AÑO",
         y="CRECIMIENTO_%",
-        text_auto='.2f'
+        text_auto=".2f"
     )
 
     fig_growth.update_layout(
         template="plotly_dark",
-        height=500
+        height=550,
+        xaxis_title="Año",
+        yaxis_title="Crecimiento %"
     )
 
-    st.plotly_chart(fig_growth, use_container_width=True)
+    st.plotly_chart(
+        fig_growth,
+        use_container_width=True
+    )
 
     # =====================================================
-    # VARIACION VS AÑO ANTERIOR
+    # SEMAFORO
     # =====================================================
 
-    st.subheader("🚦 Variación vs Año Anterior")
+    ultimo_crecimiento = (
+        df_mes["CRECIMIENTO_%"].iloc[-1]
+    )
 
-    ultimo_crecimiento = df_mes["CRECIMIENTO_%"].iloc[-1]
+    st.subheader("🚦 Indicador de Desempeño")
 
     if ultimo_crecimiento > 10:
+
         st.success(
-            f"🟢 Crecimiento positivo de {ultimo_crecimiento:.2f}% respecto al año anterior"
+            f"""
+            🟢 El mes de {mes_seleccionado}
+            presenta un crecimiento sólido respecto
+            al año anterior.
+            """
         )
+
     elif ultimo_crecimiento > 0:
+
         st.warning(
-            f"🟡 Crecimiento moderado de {ultimo_crecimiento:.2f}%"
+            f"""
+            🟡 El mes de {mes_seleccionado}
+            presenta crecimiento moderado.
+            """
         )
+
     else:
+
         st.error(
-            f"🔴 Caída de {ultimo_crecimiento:.2f}% respecto al año anterior"
+            f"""
+            🔴 El mes de {mes_seleccionado}
+            presenta una caída respecto
+            al año anterior.
+            """
         )
+
+# =========================================================
+# TABLA
+# =========================================================
 
 st.divider()
 
-# =========================================================
-# TABLA DETALLADA
-# =========================================================
-
 st.subheader("📋 Tabla Detallada")
 
-st.dataframe(df, use_container_width=True)
+st.dataframe(
+    df,
+    use_container_width=True
+)
 
 # =========================================================
 # CONCLUSION
