@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -118,8 +119,7 @@ seccion = st.sidebar.radio(
         "Análisis por Mes",
         "Comparación Año vs Año",
         "Rankings",
-        "Insights Automáticos",
-        "Forecast"
+        "Insights Automáticos"
     ]
 )
 
@@ -131,21 +131,23 @@ if seccion == "Resumen Ejecutivo":
 
     st.subheader("📌 Resumen Ejecutivo")
 
-    st.info("""
-    Durante el periodo COVID-19 (2020-2021) se registró
-    un incremento importante en la demanda de deliverys
-    debido al crecimiento del consumo mediante canales digitales.
-    """)
-
     total_deliverys = int(df["CANTIDAD_DELIVERYS"].sum())
     venta_total = df["VENTA_TOTAL"].sum()
     ticket_promedio = df["TICKET_PROMEDIO"].mean()
 
-    c1, c2, c3 = st.columns(3)
+    crecimiento_historico = (
+        (
+            df.iloc[-1]["VENTA_TOTAL"]
+            - df.iloc[0]["VENTA_TOTAL"]
+        )
+        / df.iloc[0]["VENTA_TOTAL"]
+    ) * 100
+
+    c1, c2, c3, c4 = st.columns(4)
 
     with c1:
         st.metric(
-            "📦 Deliverys",
+            "📦 Deliverys Totales",
             f"{total_deliverys:,}"
         )
 
@@ -161,13 +163,74 @@ if seccion == "Resumen Ejecutivo":
             f"S/ {ticket_promedio:,.2f}"
         )
 
+    with c4:
+        st.metric(
+            "📈 Crecimiento Histórico",
+            f"{crecimiento_historico:.2f}%"
+        )
+
     st.divider()
 
-    st.success("""
-    El negocio presenta crecimiento histórico impulsado
-    principalmente durante el periodo de pandemia,
-    manteniendo posteriormente estabilidad comercial.
+    st.info("""
+    Durante el periodo COVID-19 (2020-2021)
+    se observa un crecimiento importante en la
+    demanda de deliverys debido al incremento
+    del consumo mediante canales digitales.
     """)
+
+    st.divider()
+
+    st.subheader("📈 Panorama General")
+
+    metrica_general = st.selectbox(
+        "Selecciona métrica",
+        [
+            "VENTA_TOTAL",
+            "CANTIDAD_DELIVERYS",
+            "TICKET_PROMEDIO"
+        ]
+    )
+
+    nombres = {
+        "VENTA_TOTAL": "Ventas",
+        "CANTIDAD_DELIVERYS": "Deliverys",
+        "TICKET_PROMEDIO": "Ticket Promedio"
+    }
+
+    fig_general = px.line(
+        df,
+        x="AÑO",
+        y=metrica_general,
+        color="MES",
+        markers=True
+    )
+
+    fig_general.update_layout(
+        template="plotly_dark",
+        height=600,
+        title=f"Panorama General - {nombres[metrica_general]}",
+        xaxis_title="Año",
+        yaxis_title=nombres[metrica_general]
+    )
+
+    fig_general.add_vline(
+        x=2020,
+        line_width=2,
+        line_dash="dash",
+        line_color="red"
+    )
+
+    fig_general.add_annotation(
+        x=2020,
+        y=df[metrica_general].max(),
+        text="COVID",
+        showarrow=True
+    )
+
+    st.plotly_chart(
+        fig_general,
+        use_container_width=True
+    )
 
 # =========================================================
 # KPIs
@@ -175,75 +238,243 @@ if seccion == "Resumen Ejecutivo":
 
 elif seccion == "KPIs":
 
-    st.subheader("📊 KPIs Estratégicos")
+    st.subheader("📊 KPIs Estratégicos (YoY)")
 
-    mejor_anio = (
-        df.groupby("AÑO")["VENTA_TOTAL"]
-        .sum()
-        .idxmax()
+    meses_ordenados = sorted(
+        df["MES"].unique(),
+        key=lambda x: orden_meses[x]
     )
 
-    mejor_mes = (
-        df.loc[df["VENTA_TOTAL"].idxmax()]
+    mes_kpi = st.selectbox(
+        "Selecciona un mes",
+        meses_ordenados
     )
 
-    crecimiento_total = (
-        (
-            df.iloc[-1]["VENTA_TOTAL"]
-            - df.iloc[0]["VENTA_TOTAL"]
-        )
-        / df.iloc[0]["VENTA_TOTAL"]
-    ) * 100
+    anios = sorted(df["AÑO"].unique())
 
-    k1, k2, k3, k4 = st.columns(4)
+    colf1, colf2 = st.columns(2)
 
-    with k1:
-        st.metric(
-            "🏆 Mejor Año",
-            f"{mejor_anio}"
+    with colf1:
+
+        anio_base = st.selectbox(
+            "Año Base",
+            anios,
+            index=len(anios)-2
         )
 
-    with k2:
-        st.metric(
-            "🔥 Mejor Mes",
-            f"{mejor_mes['MES']} {mejor_mes['AÑO']}"
+    with colf2:
+
+        anio_compare = st.selectbox(
+            "Año Comparativo",
+            anios,
+            index=len(anios)-1
         )
 
-    with k3:
-        st.metric(
-            "📈 Crecimiento",
-            f"{crecimiento_total:.2f}%"
+    df_base = df[
+        (df["MES"] == mes_kpi)
+        &
+        (df["AÑO"] == anio_base)
+    ]
+
+    df_compare = df[
+        (df["MES"] == mes_kpi)
+        &
+        (df["AÑO"] == anio_compare)
+    ]
+
+    if df_base.empty or df_compare.empty:
+
+        st.error("No existen datos para esa comparación.")
+
+    else:
+
+        venta_base = df_base["VENTA_TOTAL"].values[0]
+        venta_compare = df_compare["VENTA_TOTAL"].values[0]
+
+        delivery_base = df_base["CANTIDAD_DELIVERYS"].values[0]
+        delivery_compare = df_compare["CANTIDAD_DELIVERYS"].values[0]
+
+        ticket_base = df_base["TICKET_PROMEDIO"].values[0]
+        ticket_compare = df_compare["TICKET_PROMEDIO"].values[0]
+
+        diferencia_ventas = venta_compare - venta_base
+        diferencia_deliverys = delivery_compare - delivery_base
+        diferencia_ticket = ticket_compare - ticket_base
+
+        crecimiento_ventas = (
+            diferencia_ventas / venta_base
+        ) * 100
+
+        crecimiento_deliverys = (
+            diferencia_deliverys / delivery_base
+        ) * 100
+
+        crecimiento_ticket = (
+            diferencia_ticket / ticket_base
+        ) * 100
+
+        st.markdown(
+            f"""
+            ## 📌 Comparativa:
+            {mes_kpi} {anio_base}
+            vs
+            {mes_kpi} {anio_compare}
+            """
         )
 
-    with k4:
-        st.metric(
-            "🧾 Ticket Máximo",
-            f"S/ {df['TICKET_PROMEDIO'].max():,.2f}"
+        k1, k2, k3 = st.columns(3)
+
+        with k1:
+
+            st.metric(
+                "💰 Ventas",
+                f"S/ {venta_compare:,.0f}",
+                delta=f"{crecimiento_ventas:.2f}%"
+            )
+
+        with k2:
+
+            st.metric(
+                "📦 Deliverys",
+                f"{delivery_compare:,.0f}",
+                delta=f"{crecimiento_deliverys:.2f}%"
+            )
+
+        with k3:
+
+            st.metric(
+                "🧾 Ticket Promedio",
+                f"S/ {ticket_compare:,.2f}",
+                delta=f"{crecimiento_ticket:.2f}%"
+            )
+
+        st.divider()
+
+        st.subheader("📊 Diferencias Absolutas")
+
+        d1, d2, d3 = st.columns(3)
+
+        with d1:
+
+            st.metric(
+                "💵 Diferencia Ventas",
+                f"S/ {diferencia_ventas:,.0f}"
+            )
+
+        with d2:
+
+            st.metric(
+                "🚚 Diferencia Deliverys",
+                f"{diferencia_deliverys:,.0f}"
+            )
+
+        with d3:
+
+            st.metric(
+                "🧾 Diferencia Ticket",
+                f"S/ {diferencia_ticket:,.2f}"
+            )
+
+        st.divider()
+
+        st.subheader("📈 Comparación Visual")
+
+        comparativo_df = pd.DataFrame({
+
+            "Indicador": [
+                "Ventas",
+                "Deliverys",
+                "Ticket"
+            ],
+
+            f"{anio_base}": [
+                venta_base,
+                delivery_base,
+                ticket_base
+            ],
+
+            f"{anio_compare}": [
+                venta_compare,
+                delivery_compare,
+                ticket_compare
+            ]
+        })
+
+        comparativo_melt = comparativo_df.melt(
+            id_vars="Indicador",
+            var_name="Año",
+            value_name="Valor"
         )
 
-    st.divider()
+        fig_compare = px.bar(
+            comparativo_melt,
+            x="Indicador",
+            y="Valor",
+            color="Año",
+            barmode="group",
+            text_auto=".2s"
+        )
 
-    st.subheader("🚦 Indicador de Crecimiento")
+        fig_compare.update_layout(
+            template="plotly_dark",
+            height=550
+        )
 
-    fig_gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=crecimiento_total,
-        title={'text': "Crecimiento Histórico %"},
-        gauge={
-            'axis': {'range': [-100, 100]},
-            'bar': {'color': "green"}
-        }
-    ))
+        st.plotly_chart(
+            fig_compare,
+            use_container_width=True
+        )
 
-    fig_gauge.update_layout(
-        template="plotly_dark",
-        height=450
-    )
+        st.divider()
 
-    st.plotly_chart(
-        fig_gauge,
-        use_container_width=True
-    )
+        st.subheader("📌 Interpretación Ejecutiva")
+
+        if crecimiento_ventas > 0:
+
+            st.success(
+                f"""
+                El mes de {mes_kpi} del año {anio_compare}
+                presentó un crecimiento de
+                {crecimiento_ventas:.2f}% en ventas
+                respecto al mismo mes del año {anio_base}.
+
+                Esto representa una diferencia positiva de
+                S/ {diferencia_ventas:,.0f}.
+                """
+            )
+
+        else:
+
+            st.error(
+                f"""
+                El mes de {mes_kpi} del año {anio_compare}
+                presentó una caída de
+                {abs(crecimiento_ventas):.2f}% en ventas
+                respecto al mismo mes del año {anio_base}.
+                """
+            )
+
+        st.divider()
+
+        st.subheader("🧠 ¿Cómo se calcula el KPI?")
+
+        st.info(
+            f"""
+            Fórmula del crecimiento YoY:
+
+            ((Valor Nuevo - Valor Antiguo)
+            / Valor Antiguo) x 100
+
+            Ejemplo aplicado:
+
+            (({venta_compare:,.0f}
+            - {venta_base:,.0f})
+            / {venta_base:,.0f}) x 100
+
+            Resultado:
+            {crecimiento_ventas:.2f}%
+            """
+        )
 
 # =========================================================
 # ANALISIS POR MES
@@ -331,41 +562,6 @@ elif seccion == "Análisis por Mes":
         use_container_width=True
     )
 
-    st.divider()
-
-    crecimiento = (
-        df_mes["CRECIMIENTO_%"].iloc[-1]
-    )
-
-    if crecimiento > 10:
-
-        st.success(
-            f"""
-            🟢 El mes de {mes}
-            presenta crecimiento sólido respecto
-            al año anterior.
-            """
-        )
-
-    elif crecimiento > 0:
-
-        st.warning(
-            f"""
-            🟡 El mes de {mes}
-            presenta crecimiento moderado.
-            """
-        )
-
-    else:
-
-        st.error(
-            f"""
-            🔴 El mes de {mes}
-            presenta desaceleración respecto
-            al año anterior.
-            """
-        )
-
 # =========================================================
 # COMPARACION AÑO VS AÑO
 # =========================================================
@@ -377,23 +573,23 @@ elif seccion == "Comparación Año vs Año":
     anios = sorted(df["AÑO"].unique())
 
     anio1 = st.selectbox(
-        "Selecciona Año 1",
+        "Selecciona Año Base",
         anios,
         index=len(anios)-2
     )
 
     anio2 = st.selectbox(
-        "Selecciona Año 2",
+        "Selecciona Año Comparativo",
         anios,
         index=len(anios)-1
     )
 
-    comparacion = df[
+    df_compare = df[
         df["AÑO"].isin([anio1, anio2])
     ]
 
     fig_compare = px.bar(
-        comparacion,
+        df_compare,
         x="MES",
         y="VENTA_TOTAL",
         color="AÑO",
@@ -486,6 +682,14 @@ elif seccion == "Insights Automáticos":
         df.loc[df["VENTA_TOTAL"].idxmax()]
     )
 
+    crecimiento_total = (
+        (
+            df.iloc[-1]["VENTA_TOTAL"]
+            - df.iloc[0]["VENTA_TOTAL"]
+        )
+        / df.iloc[0]["VENTA_TOTAL"]
+    ) * 100
+
     st.success(
         f"""
         📌 El mejor año histórico fue {mejor_anio}
@@ -500,69 +704,11 @@ elif seccion == "Insights Automáticos":
         """
     )
 
-    crecimiento_total = (
-        (
-            df.iloc[-1]["VENTA_TOTAL"]
-            - df.iloc[0]["VENTA_TOTAL"]
-        )
-        / df.iloc[0]["VENTA_TOTAL"]
-    ) * 100
-
-    if crecimiento_total > 0:
-
-        st.success(
-            f"""
-            📈 El negocio presenta crecimiento histórico
-            acumulado de {crecimiento_total:.2f}%.
-            """
-        )
-
-    else:
-
-        st.error(
-            """
-            📉 El negocio presenta desaceleración
-            histórica.
-            """
-        )
-
-# =========================================================
-# FORECAST
-# =========================================================
-
-elif seccion == "Forecast":
-
-    st.subheader("🔮 Forecast Simple")
-
-    forecast = (
-        df.groupby("AÑO")["VENTA_TOTAL"]
-        .sum()
-        .reset_index()
-    )
-
-    forecast["PROYECCION"] = (
-        forecast["VENTA_TOTAL"]
-        .rolling(2)
-        .mean()
-    )
-
-    fig_forecast = px.line(
-        forecast,
-        x="AÑO",
-        y=["VENTA_TOTAL", "PROYECCION"],
-        markers=True
-    )
-
-    fig_forecast.update_layout(
-        template="plotly_dark",
-        height=600,
-        xaxis_title="Año",
-        yaxis_title="Venta Total"
-    )
-
-    st.plotly_chart(
-        fig_forecast,
-        use_container_width=True
+    st.success(
+        f"""
+        📈 El negocio presenta crecimiento histórico
+        acumulado de {crecimiento_total:.2f}%.
+        """
     )
 
 # =========================================================
@@ -584,6 +730,7 @@ with st.expander("📋 Ver Tabla Completa"):
 
 st.markdown("---")
 st.caption("Dashboard desarrollado en Streamlit")
+```
 
 
 
