@@ -730,7 +730,7 @@ with st.expander("📋 Ver Tabla Completa"):
 
 st.markdown("---")
 st.caption("Dashboard desarrollado en Streamlit")
-```
+
 
 
 
